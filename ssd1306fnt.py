@@ -1,4 +1,5 @@
 import argparse
+import itertools
 import freetype
 
 
@@ -209,6 +210,39 @@ def prepare_for_ssd1306(face, char, glyph_w, glyph_h, left_fields, right_fields)
     return [real_w, real_h] + ssd_glyph
 
 
+def parse_chars_to_convert(char_list):
+    result = []
+    for char_item in char_list:
+        if len(char_item) > 1:  # We got a char range as an item
+            (start, end) = char_item.split(sep='-')
+            char_range = [chr(char) for char in range(ord(start), ord(end))] + [end]
+            result += char_range
+        else:
+            result.append(char_item)
+    result.sort()
+    return result
+
+
+def group_chars(chars):
+    def calculate_offset(index):
+        utf8_code = chars[index].encode('utf-8')
+        code = int.from_bytes(utf8_code, byteorder='big')
+        offset = code - index
+        return chars[index], offset
+
+    chars_offset = [calculate_offset(index) for index in range(len(chars))]
+
+    chars_grouped = itertools.groupby(chars_offset, lambda x: x[1])
+    result = [(group_n, [ord(char[0]) for char in chars_group]) for (group_n, chars_group) in chars_grouped]
+
+    if debug_mode:
+        print('Grouped chars: ')
+        for group in result:
+            print(group)
+
+    return result
+
+
 def app():
     args = parse_args()
     global debug_mode
@@ -230,6 +264,11 @@ def app():
     ssd_data = prepare_for_ssd1306(face, ')', glyph_w, glyph_h, args.fields_left, args.fields_right)
     print(', '.join([f'0x{data:0>2X}' for data in ssd_data]))
 
+    chars_to_gen = parse_chars_to_convert(args.chars)
+
+
+    if debug_mode:
+        print(f'Glyphs to generate: {len(chars_to_gen)}')
 
 
 if __name__ == '__main__':
