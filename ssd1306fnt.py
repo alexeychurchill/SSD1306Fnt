@@ -17,14 +17,16 @@ def parse_args():
         type=argparse.FileType('w', encoding='UTF-8'),
         help='output file (usually, file with .h extension)'
     )
-    args_parser.add_argument('--glyph_width', '-gw', type=int, default=5, help='glyph width (default - 5)')
+    args_parser.add_argument('--glyph_width', '-gw', type=int, help='glyph width')
     args_parser.add_argument(
         '--glyph_height', '-gh',
         type=int,
         default=8,
+        required=True,
         help='glyph height (default - 8, equal to the SSD1306 page "height")'
     )
-    args_parser.add_argument('--encoding', '-e', type=str, help='chars encoding')
+    args_parser.add_argument('--fields_left', '-fl', type=int, default=0, help='width of left indent')
+    args_parser.add_argument('--fields_right', '-fr', type=int, default=0, help='width of right indent')
     args_parser.add_argument('--chars', '-c', nargs='*', help='sets of chars')
     args_parser.add_argument('--debug', '-dbg', help='print some debug info', action='store_true', default=False)
     return args_parser.parse_args()
@@ -43,6 +45,10 @@ def binarize(glyph, threshold=1):
 
 def image_to_2d(linear_img, w, h):
     return [linear_img[(y * w):(y * w + w)] for y in range(0, h)]
+
+
+def glyph_insert_empty_cols(glyph_2d, columns_left=0, columns_right=0):
+    return [[0] * columns_left + glyph_row + [0] * columns_right for glyph_row in glyph_2d]
 
 
 def append_height(glyph_2d, target_height):
@@ -72,14 +78,21 @@ def append_width(glyph_2d, target_width):
 
     diff_start = width_diff // 2
     diff_end = width_diff - diff_start  # For cases, when width_diff cannot be divided by 2 w/o reminder
-    return [[0] * diff_start + glyph_row + [0] * diff_end for glyph_row in glyph_2d]
+    return glyph_insert_empty_cols(glyph_2d, diff_start, diff_end)
 
 
 def append_glyph(glyph_2d, target_width, target_height):
     return append_height(append_width(glyph_2d, target_width), target_height)
 
 
-def generate_glyph(face, character, width, height, do_append_width=True):
+def generate_glyph(
+        face,
+        character,
+        width=None,
+        height=ssd1306_page_size,
+        left_fields=0,
+        right_fields=0
+):
     if debug_mode:
         print('--------------------------------------')
         print(f'Generating char glyph for {character}, desired size: {width} x {height}...')
@@ -102,18 +115,24 @@ def generate_glyph(face, character, width, height, do_append_width=True):
         print_image(glyph_2d)
 
     if debug_mode:
-        if do_append_width:
+        if width is not None:
             print('Will append both horizontally and vertically')
         else:
             print('Will append only vertically')
 
-    glyph_ready = append_glyph(glyph_2d, width, height) if do_append_width else append_height(glyph_2d, height)
+    glyph_appended = append_glyph(glyph_2d, width, height) if width is not None else append_height(glyph_2d, height)
+
+    if debug_mode:
+        if left_fields > 0 or right_fields > 0:
+            print(f'Will add fields to the glyph: L: {left_fields} R: {right_fields}')
+
+    result = glyph_insert_empty_cols(glyph_appended, columns_left=left_fields, columns_right=right_fields)
 
     if debug_mode:
         print('Ready glyph: ')
-        print_image(glyph_ready)
+        print_image(result)
 
-    return glyph_ready
+    return result
 
 
 def convert_to_ssd1306_format(glyph_2d):
@@ -157,7 +176,7 @@ def convert_to_ssd1306_format(glyph_2d):
             print(end='\n')
 
     def get_pixel(page, y):
-        return page[y] << (ssd1306_page_size - 1 - y)
+        return page[y] << y
 
     result = list()
 
@@ -170,6 +189,24 @@ def convert_to_ssd1306_format(glyph_2d):
             result.append(page_value)
 
     return result
+
+
+def prepare_for_ssd1306(face, char, glyph_w, glyph_h, left_fields, right_fields):
+    glyph = generate_glyph(
+        face,
+        char,
+        width=glyph_w, height=glyph_h,
+        left_fields=left_fields, right_fields=right_fields
+    ) if glyph_w is not None else generate_glyph(
+        face, char,
+        height=glyph_h,
+        left_fields=left_fields, right_fields=right_fields
+    )
+
+    ssd_glyph = convert_to_ssd1306_format(glyph)
+    real_h = len(glyph)
+    real_w = len(glyph[0])
+    return [real_w, real_h] + ssd_glyph
 
 
 def app():
@@ -190,7 +227,9 @@ def app():
         glyph_h += ssd1306_page_size - glyph_h_rem
         print(f'WARNING! Glyph height wasn\'t multiple to {ssd1306_page_size}. Was set to {glyph_h}')
 
-    glyph = generate_glyph(face, 'О', glyph_w, glyph_h)
+    ssd_data = prepare_for_ssd1306(face, ')', glyph_w, glyph_h, args.fields_left, args.fields_right)
+    print(', '.join([f'0x{data:0>2X}' for data in ssd_data]))
+
 
 
 if __name__ == '__main__':
