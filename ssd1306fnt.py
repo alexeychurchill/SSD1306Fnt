@@ -3,6 +3,7 @@ import freetype
 
 
 debug_mode = False
+ssd1306_page_size = 8
 
 
 def parse_args():
@@ -114,9 +115,20 @@ def app():
     global debug_mode
     debug_mode = args.debug
     face = freetype.Face(args.fontfile)
-    glyph = generate_glyph(face, 'F', args.glyph_width, args.glyph_height)
-    print(glyph)
-    print(args.chars)
+
+    glyph_w = args.glyph_width
+    glyph_h = args.glyph_height
+
+    if glyph_h < ssd1306_page_size:
+        glyph_h = ssd1306_page_size
+        print(f'WARNING! Glyph height can\'t be less than {ssd1306_page_size}! Was set to {glyph_h}')
+
+    glyph_h_rem = glyph_h % ssd1306_page_size
+    if glyph_h_rem > 0:
+        glyph_h += ssd1306_page_size - glyph_h_rem
+        print(f'WARNING! Glyph height wasn\'t multiple to {ssd1306_page_size}. Was set to {glyph_h}')
+
+    glyph = generate_glyph(face, 'О', glyph_w, glyph_h)
 
 
 if __name__ == '__main__':
