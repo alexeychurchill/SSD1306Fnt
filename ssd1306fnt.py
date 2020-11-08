@@ -110,6 +110,62 @@ def generate_glyph(face, character, width, height):
     return glyph_ready
 
 
+def convert_to_ssd1306_format(glyph_2d):
+    glyph_h = len(glyph_2d)
+    if glyph_h < 1:
+        raise Exception('Glyph has incorrect height!')
+
+    glyph_w = len(glyph_2d[0])
+    if glyph_w < 1:
+        raise Exception('Glyph has incorrect width!')
+
+    if glyph_h % 8 != 0:
+        raise Exception('Glyph must have height multiple of 8')
+
+    glyph_rotated = [[glyph_2d[y][x] for y in range(glyph_h)] for x in range(glyph_w)]
+
+    if debug_mode:
+        print('Transformed glyph for the SSD1306: ')
+        print_image(glyph_rotated)
+
+    page_per_col = glyph_h // ssd1306_page_size
+
+    if debug_mode:
+        print(f'Glyph is {glyph_w} x {glyph_h} --> each glyph column will take {page_per_col} pages')
+
+    def take_page(col, page):
+        page_start = page * ssd1306_page_size
+        page_end = page_start + ssd1306_page_size
+        return glyph_rotated[col][page_start:page_end]
+
+    glyph_paged = [[take_page(col, page) for page in range(page_per_col)] for col in range(glyph_w)]
+
+    if debug_mode:
+        print('Paged glyph:')
+        for col in range(glyph_w):
+            for page in range(page_per_col):
+                print(f'Page {page}: |', end='')
+                for row in range(ssd1306_page_size):
+                    print('#' if glyph_paged[col][page][row] > 0 else '.', end='')
+                print('| ', end='')
+            print(end='\n')
+
+    def get_pixel(page, y):
+        return page[y] << (ssd1306_page_size - 1 - y)
+
+    result = list()
+
+    for col in range(glyph_w):
+        for page in range(page_per_col):
+            page_bin = [get_pixel(glyph_paged[col][page], row) for row in range(len(glyph_paged[col][page]))]
+            page_value = 0x0
+            for page_pixel in page_bin:
+                page_value |= page_pixel
+            result.append(page_value)
+
+    return result
+
+
 def app():
     args = parse_args()
     global debug_mode
