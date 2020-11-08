@@ -79,7 +79,7 @@ def append_glyph(glyph_2d, target_width, target_height):
     return append_height(append_width(glyph_2d, target_width), target_height)
 
 
-def generate_glyph(face, character, width, height):
+def generate_glyph(face, character, width, height, do_append_width=True):
     if debug_mode:
         print('--------------------------------------')
         print(f'Generating char glyph for {character}, desired size: {width} x {height}...')
@@ -101,7 +101,13 @@ def generate_glyph(face, character, width, height):
         print('Generated glyph: ')
         print_image(glyph_2d)
 
-    glyph_ready = append_glyph(glyph_2d, width, height)
+    if debug_mode:
+        if do_append_width:
+            print('Will append both horizontally and vertically')
+        else:
+            print('Will append only vertically')
+
+    glyph_ready = append_glyph(glyph_2d, width, height) if do_append_width else append_height(glyph_2d, height)
 
     if debug_mode:
         print('Ready glyph: ')
