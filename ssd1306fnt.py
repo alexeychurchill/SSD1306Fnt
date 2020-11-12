@@ -5,6 +5,16 @@ import freetype
 
 debug_mode = False
 ssd1306_page_size = 8
+c_lookup_func_arg_name = 'utf8_code'
+c_disclaimer = """/**
+ * 
+ * ******************** DO NOT MODIFY THIS FILE MANUALLY! ********************
+ * The file was generated with SSD1306Fnt font generator, so do not edit it  
+ * unless you are 100000% sure in your actions. If you need something to have 
+ * changed in the file, the best solution is to use SSD1306Fnt again. 
+ *
+ **/
+"""
 
 
 def parse_args():
@@ -17,6 +27,13 @@ def parse_args():
         'out',
         type=argparse.FileType('w', encoding='UTF-8'),
         help='output file (usually, file with .h extension)'
+    )
+    args_parser.add_argument(
+        '--cname',
+        '-cn',
+        type=str,
+        required=True,
+        help='prefix/suffix of the font related things in the .h out file'
     )
     args_parser.add_argument('--glyph_width', '-gw', type=int, help='glyph width')
     args_parser.add_argument(
@@ -258,11 +275,74 @@ def groups_reduce(groups):
     return [reduce_group(group) for group in groups]
 
 
+def c_gen_group_if(group, arg_name):
+    (offset, item_min, item_max) = group
+    item_min = utf_8_encode(item_min)
+    item_max = utf_8_encode(item_max)
+
+    if item_min == item_max:
+        return f'if ({item_min} == {arg_name}) ' \
+               + '{ ' + f'return {arg_name} - {offset};' \
+               + ' };'
+    else:
+        return f'if ({item_min} <= {arg_name} && {arg_name} <= {item_max}) ' \
+               + '{ ' + f'return {arg_name} - {offset};' \
+               + ' };'
+
+
+def c_format_to_hex(value):
+    return f'0x{value:0>2X}u'
+
+
+def c_incl_guard(cname):
+    return f'SSD1306_FONT_{cname.upper()}_H'
+
+
+def c_write_header(fout, cname):
+    incl_guard = c_incl_guard(cname)
+    fout.write(f'#ifndef {incl_guard} // Start of {incl_guard}\n')
+    fout.write(f'#define {incl_guard}\n\n')
+    fout.write('#include <stdint.h>\n')
+
+
+def c_write_glyph_count(fout, cname, count):
+    fout.write(f'#define SSD1306_{cname.upper()}_GLYPH_COUNT\t0x{count:0>2X}u\n\n')
+
+
+def c_write_glyphs_array(fout, cname, glyphs):
+    c_glyphs_rows = ['\t{ ' + f'{", ".join([c_format_to_hex(data) for data in glyph])}' + ' }' for glyph in glyphs]
+    c_data = ', \n'.join(c_glyphs_rows) + '\n'
+    fout.write(f'const uint8_t ssd1306_{cname}_glyphs[][] = ' + '{\n' + c_data + '};\n')
+
+
+def c_write_lookup_func(fout, cname, reduced_groups):
+    fout.write(f'uint32_t ssd1306_{cname}_get_glyph_index')
+    fout.write(f'(uint32_t {c_lookup_func_arg_name})')
+    fout.write(' {\n')
+
+    for group in reduced_groups:
+        c_group_code = c_gen_group_if(group, c_lookup_func_arg_name)
+        fout.write('\t')
+        fout.write(c_group_code)
+        fout.write('\n')
+
+    fout.write('\treturn 0;\n}\n')
+    pass
+
+
+def c_write_footer(fout, cname):
+    guard = c_incl_guard(cname)
+    fout.write(f'#endif // End of {guard}\n')
+
+
 def app():
     args = parse_args()
     global debug_mode
     debug_mode = args.debug
     face = freetype.Face(args.fontfile)
+
+    out_file = args.out
+    cname = args.cname
 
     glyph_w = args.glyph_width
     glyph_h = args.glyph_height
@@ -276,16 +356,27 @@ def app():
         glyph_h += ssd1306_page_size - glyph_h_rem
         print(f'WARNING! Glyph height wasn\'t multiple to {ssd1306_page_size}. Was set to {glyph_h}')
 
-    ssd_data = prepare_for_ssd1306(face, ')', glyph_w, glyph_h, args.fields_left, args.fields_right)
-    print(', '.join([f'0x{data:0>2X}' for data in ssd_data]))
-
     chars_to_gen = parse_chars_to_convert(args.chars)
-
 
     if debug_mode:
         print(f'Glyphs to generate: {len(chars_to_gen)}')
 
+    ssd1306_glyph_data = prepare_for_ssd1306(face, chars_to_gen, glyph_w, glyph_h, args.fields_left, args.fields_right)
+    reduced_char_groups = groups_reduce(group_chars(chars_to_gen))
+
+    print(f'Done! Glyphs data took {len(ssd1306_glyph_data) * len(ssd1306_glyph_data[0])} bytes.\nWriting .h-file...')
+
+    c_write_header(out_file, cname)
+    out_file.write('\n')
+    out_file.write(c_disclaimer)
+    out_file.write('\n')
+    c_write_glyph_count(out_file, cname, len(ssd1306_glyph_data))
+    c_write_glyphs_array(out_file, cname, ssd1306_glyph_data)
+    out_file.write('\n')
+    c_write_lookup_func(out_file, cname, reduced_char_groups)
+    out_file.write('\n')
+    c_write_footer(out_file, cname)
+
 
 if __name__ == '__main__':
-    # print(ord('ї'.encode('cp1251')))
     app()
