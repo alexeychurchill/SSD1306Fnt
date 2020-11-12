@@ -13,11 +13,11 @@ ssd1306fnt.py fontfile out -c <char sets> -gh <glyph height>
 - `fontfile` - file of a desired font
 - `out` - output .h-file
 - `--cname`/`-cn` - prefix/suffix of the font related things in the .h out file
--  `--glyph_width`/`-gw` - glyph width
--  `--glyph_height`/`-gh` - glyph height (default - 8, equal to the SSD1306 page "height")
--  `--fields_left`/`-fl` - width of left indent
--  `--fields_right`/`-fr` - width of right indent
--  `--chars`/`-c` - sets of chars. Format: `single char` or `start char`-`end char`. 
+- `--glyph_width`/`-gw` - glyph width
+- `--glyph_height`/`-gh` - glyph height (default - 8, equal to the SSD1306 page "height")
+- `--fields_left`/`-fl` - width of left indent
+- `--fields_right`/`-fr` - width of right indent
+- `--chars`/`-c` - sets of chars. Format: `single char` or `start char`-`end char`. 
     Can be used with few single chars and char ranges mixed
 
 ### Data generation format
