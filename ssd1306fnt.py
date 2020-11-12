@@ -226,17 +226,20 @@ def parse_chars_to_convert(char_list):
     return result
 
 
+def utf_8_encode(char):
+    utf_8_code = char.encode('utf-8')
+    return int.from_bytes(utf_8_code, byteorder='big')
+
+
 def group_chars(chars):
     def calculate_offset(index):
-        utf8_code = chars[index].encode('utf-8')
-        code = int.from_bytes(utf8_code, byteorder='big')
-        offset = code - index
+        offset = utf_8_encode(chars[index]) - index
         return chars[index], offset
 
     chars_offset = [calculate_offset(index) for index in range(len(chars))]
 
     chars_grouped = itertools.groupby(chars_offset, lambda x: x[1])
-    result = [(group_n, [ord(char[0]) for char in chars_group]) for (group_n, chars_group) in chars_grouped]
+    result = [(group_n, [char[0] for char in chars_group]) for (group_n, chars_group) in chars_grouped]
 
     if debug_mode:
         print('Grouped chars: ')
@@ -244,6 +247,15 @@ def group_chars(chars):
             print(group)
 
     return result
+
+
+def groups_reduce(groups):
+    def reduce_group(group):
+        (offset, items) = group
+        item_min = min(items)
+        item_max = max(items)
+        return offset, item_min, item_max
+    return [reduce_group(group) for group in groups]
 
 
 def app():
