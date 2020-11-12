@@ -192,22 +192,25 @@ def convert_to_ssd1306_format(glyph_2d):
     return result
 
 
-def prepare_for_ssd1306(face, char, glyph_w, glyph_h, left_fields, right_fields):
-    glyph = generate_glyph(
-        face,
-        char,
-        width=glyph_w, height=glyph_h,
-        left_fields=left_fields, right_fields=right_fields
-    ) if glyph_w is not None else generate_glyph(
-        face, char,
-        height=glyph_h,
-        left_fields=left_fields, right_fields=right_fields
-    )
+def prepare_for_ssd1306(face, chars, glyph_w=None, glyph_h=0, left_fields=0, right_fields=0):
+    def build_glyph(char):
+        glyph = generate_glyph(
+            face,
+            char,
+            width=glyph_w, height=glyph_h,
+            left_fields=left_fields, right_fields=right_fields
+        ) if glyph_w is not None else generate_glyph(
+            face,
+            char,
+            height=glyph_h,
+            left_fields=left_fields, right_fields=right_fields
+        )
 
-    ssd_glyph = convert_to_ssd1306_format(glyph)
-    real_h = len(glyph)
-    real_w = len(glyph[0])
-    return [real_w, real_h] + ssd_glyph
+        ssd_glyph = convert_to_ssd1306_format(glyph)
+        real_h = len(glyph)
+        real_w = len(glyph[0])
+        return [real_w, real_h] + ssd_glyph
+    return [build_glyph(char) for char in chars]
 
 
 def parse_chars_to_convert(char_list):
