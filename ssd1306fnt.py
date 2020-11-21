@@ -331,7 +331,7 @@ def c_gen_glyph_data(cname, glyph):
     chunks = [data[(chunk_ind * max_items):(chunk_ind * max_items) + max_items] for chunk_ind in range(0, chunk_count)]
     chunks_formatted = [', '.join([c_format_to_hex(c) for c in chunk]) for chunk in chunks]
     data_str = ', \n'.join(['\t' + item for item in chunks_formatted])
-    return f'const uint8_t {c_gen_glyph_array_name(cname, char)}[] = ' + '{\n' + data_str + '\n}'
+    return f'const uint8_t {c_gen_glyph_array_name(cname, char)}[] = ' + '{\n' + data_str + '\n};'
 
 
 def c_write_glyphs_array(fout, cname, glyphs):
@@ -339,7 +339,7 @@ def c_write_glyphs_array(fout, cname, glyphs):
     glyphs_table = [c_gen_glyph_array_name(cname, glyph[0]) for glyph in glyphs]
     c_glyphs_table = f'const (*uint8_t)[] ssd1306_{cname.lower()}_glyph_table = ' + '{\n' + \
                      ', \n'.join(['\t' + glyph_ptr_name for glyph_ptr_name in glyphs_table]) + \
-                     '\n}'
+                     '\n};'
 
     fout.write(c_glyphs_data)
     fout.write('\n\n')
@@ -348,7 +348,7 @@ def c_write_glyphs_array(fout, cname, glyphs):
 
 
 def c_write_lookup_func(fout, cname, reduced_groups):
-    fout.write(f'uint32_t ssd1306_{cname}_get_glyph_index')
+    fout.write(f'uint32_t ssd1306_{cname.lower()}_get_glyph_index')
     fout.write(f'(uint32_t {c_lookup_func_arg_name})')
     fout.write(' {\n')
 
