@@ -21,7 +21,8 @@ ssd1306fnt.py fontfile out -c <char sets> -gh <glyph height>
     Can be used with few single chars and char ranges mixed
 
 ### Data generation format
-The script generates a 2D-array which contains a glyph in each row. 
+The script generates a bunch of arrays containing glyphs data and a table with pointers to 
+these arrays. 
 Each glyph (row) contains the following information: 
 1. _0 Byte_ - **Width** of the glyph
 2. _1 Byte_ - **Height** of the glyph
