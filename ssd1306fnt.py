@@ -250,8 +250,9 @@ def parse_chars_to_convert(char_list):
             result += char_range
         else:
             result.append(char_item)
-    result.sort()
-    return result
+    result_unique = list(set(result))
+    result_unique.sort()
+    return result_unique
 
 
 def utf_8_encode(char):
