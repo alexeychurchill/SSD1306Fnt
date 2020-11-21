@@ -5,6 +5,7 @@ import freetype
 
 debug_mode = False
 ssd1306_page_size = 8
+c_glyph_line_max_items = 8
 c_lookup_func_arg_name = 'utf8_code'
 c_disclaimer = """/**
  * 
@@ -237,7 +238,7 @@ def prepare_for_ssd1306(face, chars, glyph_w=None, glyph_h=0, left_fields=0, rig
         ssd_glyph = convert_to_ssd1306_format(glyph, real_w, real_h)
 
         return [real_w, real_h] + ssd_glyph
-    return [build_glyph(char) for char in chars]
+    return [(char, build_glyph(char)) for char in chars]
 
 
 def parse_chars_to_convert(char_list):
@@ -319,10 +320,31 @@ def c_write_glyph_count(fout, cname, count):
     fout.write(f'#define SSD1306_{cname.upper()}_GLYPH_COUNT\t0x{count:0>2X}u\n\n')
 
 
+def c_gen_glyph_array_name(cname, char):
+    return f'ssd1306_{cname.lower()}_glyph_data_{utf_8_encode(char)}'
+
+
+def c_gen_glyph_data(cname, glyph):
+    (char, data) = glyph
+    max_items = c_glyph_line_max_items
+    chunk_count = len(data) // max_items + (1 if len(data) % max_items > 0 else 0)
+    chunks = [data[(chunk_ind * max_items):(chunk_ind * max_items) + max_items] for chunk_ind in range(0, chunk_count)]
+    chunks_formatted = [', '.join([c_format_to_hex(c) for c in chunk]) for chunk in chunks]
+    data_str = ', \n'.join(['\t' + item for item in chunks_formatted])
+    return f'const uint8_t {c_gen_glyph_array_name(cname, char)}[] = ' + '{\n' + data_str + '\n}'
+
+
 def c_write_glyphs_array(fout, cname, glyphs):
-    c_glyphs_rows = ['\t{ ' + f'{", ".join([c_format_to_hex(data) for data in glyph])}' + ' }' for glyph in glyphs]
-    c_data = ', \n'.join(c_glyphs_rows) + '\n'
-    fout.write(f'const uint8_t ssd1306_{cname}_glyphs[{len(glyphs)}][] = ' + '{\n' + c_data + '};\n')
+    c_glyphs_data = '\n\n'.join([c_gen_glyph_data(cname, glyph) for glyph in glyphs])
+    glyphs_table = [c_gen_glyph_array_name(cname, glyph[0]) for glyph in glyphs]
+    c_glyphs_table = f'const (*uint8_t)[] ssd1306_{cname.lower()}_glyph_table = ' + '{\n' + \
+                     ', \n'.join(['\t' + glyph_ptr_name for glyph_ptr_name in glyphs_table]) + \
+                     '\n}'
+
+    fout.write(c_glyphs_data)
+    fout.write('\n\n')
+    fout.write(c_glyphs_table)
+    fout.write('\n')
 
 
 def c_write_lookup_func(fout, cname, reduced_groups):
