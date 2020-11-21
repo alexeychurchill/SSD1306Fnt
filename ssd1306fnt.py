@@ -106,7 +106,7 @@ def append_glyph(glyph_2d, target_width, target_height):
 def generate_glyph(
         face,
         character,
-        width=None,
+        width=0,
         height=ssd1306_page_size,
         left_fields=0,
         right_fields=0
@@ -138,7 +138,7 @@ def generate_glyph(
         else:
             print('Will append only vertically')
 
-    glyph_appended = append_glyph(glyph_2d, width, height) if width is not None else append_height(glyph_2d, height)
+    glyph_appended = append_glyph(glyph_2d, width, height) if width > 0 else append_height(glyph_2d, height)
 
     if debug_mode:
         if left_fields > 0 or right_fields > 0:
@@ -322,7 +322,7 @@ def c_write_glyph_count(fout, cname, count):
 def c_write_glyphs_array(fout, cname, glyphs):
     c_glyphs_rows = ['\t{ ' + f'{", ".join([c_format_to_hex(data) for data in glyph])}' + ' }' for glyph in glyphs]
     c_data = ', \n'.join(c_glyphs_rows) + '\n'
-    fout.write(f'const uint8_t ssd1306_{cname}_glyphs[][] = ' + '{\n' + c_data + '};\n')
+    fout.write(f'const uint8_t ssd1306_{cname}_glyphs[{len(glyphs)}][] = ' + '{\n' + c_data + '};\n')
 
 
 def c_write_lookup_func(fout, cname, reduced_groups):
