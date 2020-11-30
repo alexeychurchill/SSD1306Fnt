@@ -338,7 +338,7 @@ def c_gen_glyph_data(cname, glyph):
 def c_write_glyphs_array(fout, cname, glyphs):
     c_glyphs_data = '\n\n'.join([c_gen_glyph_data(cname, glyph) for glyph in glyphs])
     glyphs_table = [c_gen_glyph_array_name(cname, glyph[0]) for glyph in glyphs]
-    c_glyphs_table = f'const uint8_t(*ssd1306_{cname.lower()}_glyph_table)[] = ' + '{\n' + \
+    c_glyphs_table = f'const uint8_t* const ssd1306_{cname.lower()}_glyph_table[] = ' + '{\n' + \
                      ', \n'.join(['\t' + glyph_ptr_name for glyph_ptr_name in glyphs_table]) + \
                      '\n};'
 
