@@ -58,14 +58,6 @@ def print_image(img_2d, off='.', on='#'):
         print(end='\n')
 
 
-def binarize(glyph, threshold=1):
-    return [1 if pixel >= threshold else 0 for pixel in glyph]
-
-
-def image_to_2d(linear_img, w, h):
-    return [linear_img[(y * w):(y * w + w)] for y in range(0, h)]
-
-
 def glyph_insert_empty_cols(glyph_2d, columns_left=0, columns_right=0):
     return [[0] * columns_left + glyph_row + [0] * columns_right for glyph_row in glyph_2d]
 
@@ -116,8 +108,9 @@ def generate_glyph(
         print('--------------------------------------')
         print(f'Generating char glyph for {character}, desired size: {width} x {height}...')
 
+    char_flags = freetype.FT_LOAD_FLAGS['FT_LOAD_RENDER'] | freetype.FT_LOAD_TARGETS['FT_LOAD_TARGET_MONO']
     face.set_pixel_sizes(width, height)
-    face.load_char(character)
+    face.load_char(character, flags=char_flags)
     glyph_bitmap = face.glyph.bitmap
     glyph_width = glyph_bitmap.width
     glyph_height = glyph_bitmap.rows
@@ -126,8 +119,23 @@ def generate_glyph(
         print(f'Real glyph size is {glyph_width} x {glyph_height}')
 
     glyph_img = glyph_bitmap.buffer
-    glyph_binary = binarize(glyph_img)
-    glyph_2d = image_to_2d(glyph_binary, glyph_width, glyph_height)
+
+    bytes_per_row = len(glyph_img) // glyph_height
+    glyph_2d = []
+
+    for y in range(0, glyph_height):
+        row = []
+        start_byte = y * bytes_per_row
+        end_byte = y * bytes_per_row + bytes_per_row
+        row_bytes = glyph_img[start_byte:end_byte]
+        for row_bit_index in range(0, len(row_bytes) * 8):
+            byte_index = row_bit_index // 8
+            bit_index = 7 - (row_bit_index % 8)
+            value = 0x1 if ((row_bytes[byte_index] & (0x1 << bit_index)) >> bit_index) > 0 else 0x0
+            row.append(value)
+        glyph_2d.append(row[0:glyph_width])
+
+    glyph_2d = glyph_2d[0:glyph_height]
 
     if debug_mode:
         print('Generated glyph: ')
