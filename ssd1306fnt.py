@@ -48,6 +48,12 @@ def parse_args():
     args_parser.add_argument('--fields_right', '-fr', type=int, default=0, help='width of right indent')
     args_parser.add_argument('--chars', '-c', nargs='*', help='sets of chars')
     args_parser.add_argument('--debug', '-dbg', help='print some debug info', action='store_true', default=False)
+    args_parser.add_argument(
+        '--horizontal_paging', '-hor',
+        help='stores pages by horizontal',
+        action='store_true',
+        default=False
+    )
     return args_parser.parse_args()
 
 
@@ -174,7 +180,7 @@ def glyph_size(glyph_2d):
     return glyph_w, glyph_h
 
 
-def convert_to_ssd1306_format(glyph_2d, g_width, g_height):
+def convert_to_ssd1306_format(glyph_2d, g_width, g_height, hor_mode=False):
     glyph_rotated = [[glyph_2d[y][x] for y in range(g_height)] for x in range(g_width)]
 
     if debug_mode:
@@ -206,20 +212,28 @@ def convert_to_ssd1306_format(glyph_2d, g_width, g_height):
     def get_pixel(page, y):
         return page[y] << y
 
+    def build_page(page, col):
+        page_bin = [get_pixel(glyph_paged[col][page], row) for row in range(len(glyph_paged[col][page]))]
+        page_value = 0x0
+        for page_pixel in page_bin:
+            page_value |= page_pixel
+        return page_value
+
     result = list()
 
-    for col in range(g_width):
+    if hor_mode:
         for page in range(page_per_col):
-            page_bin = [get_pixel(glyph_paged[col][page], row) for row in range(len(glyph_paged[col][page]))]
-            page_value = 0x0
-            for page_pixel in page_bin:
-                page_value |= page_pixel
-            result.append(page_value)
+            for col in range(g_width):
+                result.append(build_page(page, col))
+    else:
+        for col in range(g_width):
+            for page in range(page_per_col):
+                result.append(build_page(page, col))
 
     return result
 
 
-def prepare_for_ssd1306(face, chars, glyph_w=None, glyph_h=0, left_fields=0, right_fields=0):
+def prepare_for_ssd1306(face, chars, glyph_w=None, glyph_h=0, left_fields=0, right_fields=0, hor_pages=False):
     def build_glyph(char):
         glyph = generate_glyph(
             face,
@@ -243,7 +257,7 @@ def prepare_for_ssd1306(face, chars, glyph_w=None, glyph_h=0, left_fields=0, rig
             print(f'WARNING! {char} ({utf_8_encode(char)}) exceeded height ({real_h}), cutting to {glyph_h}')
             real_h = glyph_h
 
-        ssd_glyph = convert_to_ssd1306_format(glyph, real_w, real_h)
+        ssd_glyph = convert_to_ssd1306_format(glyph, real_w, real_h, hor_mode=hor_pages)
 
         return [real_w, real_h] + ssd_glyph
     return [(char, build_glyph(char)) for char in chars]
@@ -402,7 +416,13 @@ def app():
     if debug_mode:
         print(f'Glyphs to generate: {len(chars_to_gen)}')
 
-    ssd1306_glyph_data = prepare_for_ssd1306(face, chars_to_gen, glyph_w, glyph_h, args.fields_left, args.fields_right)
+    ssd1306_glyph_data = prepare_for_ssd1306(
+        face,
+        chars_to_gen,
+        glyph_w, glyph_h,
+        args.fields_left, args.fields_right,
+        hor_pages=args.horizontal_paging
+    )
     reduced_char_groups = groups_reduce(group_chars(chars_to_gen))
 
     print(f'Done! Glyphs data took {len(ssd1306_glyph_data) * len(ssd1306_glyph_data[0])} bytes.\nWriting .h-file...')
