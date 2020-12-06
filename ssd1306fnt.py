@@ -382,7 +382,14 @@ def c_write_lookup_func(fout, cname, reduced_groups):
         fout.write('\n')
 
     fout.write('\treturn 0;\n}\n')
-    pass
+
+
+def c_write_glyph_func(fout, cname):
+    fout.write(f'const uint8_t* ssd1306_{cname.lower()}_get_glyph')
+    fout.write(f'(uint32_t {c_lookup_func_arg_name})' + ' {\n')
+    fout.write(f'\tuint32_t glyph_index = ssd1306_{cname.lower()}_get_glyph_index({c_lookup_func_arg_name});\n')
+    fout.write(f'\treturn ssd1306_{cname.lower()}_glyph_table[glyph_index];\n')
+    fout.write('}\n')
 
 
 def c_write_footer(fout, cname):
@@ -435,6 +442,8 @@ def app():
     c_write_glyphs_array(out_file, cname, ssd1306_glyph_data)
     out_file.write('\n')
     c_write_lookup_func(out_file, cname, reduced_char_groups)
+    out_file.write('\n')
+    c_write_glyph_func(out_file, cname)
     out_file.write('\n')
     c_write_footer(out_file, cname)
 
