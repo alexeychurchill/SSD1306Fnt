@@ -1,6 +1,7 @@
 import argparse
 import itertools
 import freetype
+import os
 
 
 debug_mode = False
@@ -20,18 +21,12 @@ c_disclaimer = """/**
 
 def parse_args():
     args_parser = argparse.ArgumentParser(description='Font faces converter for the SSD1306 displays.\nConverts font '
-                                                      'files to the C headers (.h) which are easily compatible with '
-                                                      'SSD1306 frame buffer.')
+                                                      'files to the C sources (.c + .h) which are easily compatible '
+                                                      'with SSD1306 frame buffer.')
 
     args_parser.add_argument('fontfile', type=argparse.FileType('rb'), help='file of a desired font')
     args_parser.add_argument(
-        'out',
-        type=argparse.FileType('w', encoding='UTF-8'),
-        help='output file (usually, file with .h extension)'
-    )
-    args_parser.add_argument(
-        '--cname',
-        '-cn',
+        '--cname', '-cn',
         type=str,
         required=True,
         help='prefix/suffix of the font related things in the .h out file'
@@ -328,19 +323,38 @@ def c_format_to_hex(value):
     return f'0x{value:0>2X}u'
 
 
-def c_incl_guard(cname):
+def c_write_disclaimer(fout):
+    fout.write(c_disclaimer)
+    fout.write('\n')
+
+
+def c_header_incl_guard(cname):
     return f'SSD1306_FONT_{cname.upper()}_H'
 
 
-def c_write_header(fout, cname):
-    incl_guard = c_incl_guard(cname)
+def c_header_write_top_part(fout, cname):
+    incl_guard = c_header_incl_guard(cname)
     fout.write(f'#ifndef {incl_guard} // Start of {incl_guard}\n')
     fout.write(f'#define {incl_guard}\n\n')
-    fout.write('#include <stdint.h>\n')
+    fout.write('#include <stdint.h>\n\n')
 
 
-def c_write_glyph_count(fout, cname, count):
+def c_header_write_glyph_count(fout, cname, count):
     fout.write(f'#define SSD1306_{cname.upper()}_GLYPH_COUNT\t0x{count:0>2X}u\n\n')
+
+
+def c_header_write_glyph_func_proto(fout, cname):
+    fout.write(f'const uint8_t* ssd1306_{cname.lower()}_get_glyph')
+    fout.write(f'(uint32_t {c_lookup_func_arg_name});\n\n')
+
+
+def c_header_write_bottom_part(fout, cname):
+    guard = c_header_incl_guard(cname)
+    fout.write(f'#endif // End of {guard}\n')
+
+
+def c_src_write_include(fout, header_file):
+    fout.write(f'#include "{os.path.basename(header_file.name)}"\n\n')
 
 
 def c_gen_glyph_array_name(cname, char):
@@ -354,24 +368,24 @@ def c_gen_glyph_data(cname, glyph):
     chunks = [data[(chunk_ind * max_items):(chunk_ind * max_items) + max_items] for chunk_ind in range(0, chunk_count)]
     chunks_formatted = [', '.join([c_format_to_hex(c) for c in chunk]) for chunk in chunks]
     data_str = ', \n'.join(['\t' + item for item in chunks_formatted])
-    return f'const uint8_t {c_gen_glyph_array_name(cname, char)}[] = ' + '{\n' + data_str + '\n};'
+    return f'static const uint8_t {c_gen_glyph_array_name(cname, char)}[] = ' + '{\n' + data_str + '\n};'
 
 
-def c_write_glyphs_array(fout, cname, glyphs):
+def c_src_write_glyphs_array(fout, cname, glyphs):
     c_glyphs_data = '\n\n'.join([c_gen_glyph_data(cname, glyph) for glyph in glyphs])
     glyphs_table = [c_gen_glyph_array_name(cname, glyph[0]) for glyph in glyphs]
-    c_glyphs_table = f'const uint8_t* const ssd1306_{cname.lower()}_glyph_table[] = ' + '{\n' + \
+    c_glyphs_table = f'static const uint8_t* const ssd1306_{cname.lower()}_glyph_table[] = ' + '{\n' + \
                      ', \n'.join(['\t' + glyph_ptr_name for glyph_ptr_name in glyphs_table]) + \
                      '\n};'
 
     fout.write(c_glyphs_data)
     fout.write('\n\n')
     fout.write(c_glyphs_table)
-    fout.write('\n')
+    fout.write('\n\n')
 
 
-def c_write_lookup_func(fout, cname, reduced_groups):
-    fout.write(f'uint32_t ssd1306_{cname.lower()}_get_glyph_index')
+def c_src_write_lookup_func(fout, cname, reduced_groups):
+    fout.write(f'static uint32_t ssd1306_{cname.lower()}_get_glyph_index')
     fout.write(f'(uint32_t {c_lookup_func_arg_name})')
     fout.write(' {\n')
 
@@ -381,20 +395,15 @@ def c_write_lookup_func(fout, cname, reduced_groups):
         fout.write(c_group_code)
         fout.write('\n')
 
-    fout.write('\treturn 0;\n}\n')
+    fout.write('\treturn 0;\n}\n\n')
 
 
-def c_write_glyph_func(fout, cname):
+def c_src_write_glyph_func(fout, cname):
     fout.write(f'const uint8_t* ssd1306_{cname.lower()}_get_glyph')
     fout.write(f'(uint32_t {c_lookup_func_arg_name})' + ' {\n')
     fout.write(f'\tuint32_t glyph_index = ssd1306_{cname.lower()}_get_glyph_index({c_lookup_func_arg_name});\n')
     fout.write(f'\treturn ssd1306_{cname.lower()}_glyph_table[glyph_index];\n')
     fout.write('}\n')
-
-
-def c_write_footer(fout, cname):
-    guard = c_incl_guard(cname)
-    fout.write(f'#endif // End of {guard}\n')
 
 
 def app():
@@ -403,8 +412,10 @@ def app():
     debug_mode = args.debug
     face = freetype.Face(args.fontfile)
 
-    out_file = args.out
     cname = args.cname
+
+    out_h_file = open(f'{cname.lower()}.h', 'w')
+    out_c_file = open(f'{cname.lower()}.c', 'w')
 
     glyph_w = args.glyph_width
     glyph_h = args.glyph_height
@@ -434,18 +445,22 @@ def app():
 
     print(f'Done! Glyphs data took {len(ssd1306_glyph_data) * len(ssd1306_glyph_data[0])} bytes.\nWriting .h-file...')
 
-    c_write_header(out_file, cname)
-    out_file.write('\n')
-    out_file.write(c_disclaimer)
-    out_file.write('\n')
-    c_write_glyph_count(out_file, cname, len(ssd1306_glyph_data))
-    c_write_glyphs_array(out_file, cname, ssd1306_glyph_data)
-    out_file.write('\n')
-    c_write_lookup_func(out_file, cname, reduced_char_groups)
-    out_file.write('\n')
-    c_write_glyph_func(out_file, cname)
-    out_file.write('\n')
-    c_write_footer(out_file, cname)
+    # Header file
+    c_header_write_top_part(out_h_file, cname)
+    c_write_disclaimer(out_h_file)
+    c_header_write_glyph_count(out_h_file, cname, len(ssd1306_glyph_data))
+    c_header_write_glyph_func_proto(out_h_file, cname)
+    c_header_write_bottom_part(out_h_file, cname)
+
+    # Source file
+    c_src_write_include(out_c_file, out_h_file)
+    c_write_disclaimer(out_c_file)
+    c_src_write_glyphs_array(out_c_file, cname, ssd1306_glyph_data)
+    c_src_write_lookup_func(out_c_file, cname, reduced_char_groups)
+    c_src_write_glyph_func(out_c_file, cname)
+
+    out_h_file.close()
+    out_c_file.close()
 
 
 if __name__ == '__main__':
