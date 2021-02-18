@@ -422,7 +422,7 @@ def app():
 
     cname = args.cname
 
-    out_abs_path = os.path.abspath(args.out_dir) # if args.out_dir is not None else None
+    out_abs_path = os.path.abspath(args.out_dir)
 
     pathlib.Path(out_abs_path).mkdir(parents=True, exist_ok=True)
 
