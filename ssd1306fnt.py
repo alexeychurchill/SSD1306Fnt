@@ -2,6 +2,7 @@ import argparse
 import itertools
 import freetype
 import os
+import pathlib
 
 
 debug_mode = False
@@ -30,6 +31,13 @@ def parse_args():
         type=str,
         required=True,
         help='prefix/suffix of the font related things in the .h out file'
+    )
+    args_parser.add_argument(
+        '--out_dir', '-dir',
+        type=str,
+        required=False,
+        default='.',
+        help='output dir, omit of current'
     )
     args_parser.add_argument('--glyph_width', '-gw', type=int, help='glyph width')
     args_parser.add_argument(
@@ -414,8 +422,18 @@ def app():
 
     cname = args.cname
 
-    out_h_file = open(f'{cname.lower()}.h', 'w')
-    out_c_file = open(f'{cname.lower()}.c', 'w')
+    out_abs_path = os.path.abspath(args.out_dir) # if args.out_dir is not None else None
+
+    pathlib.Path(out_abs_path).mkdir(parents=True, exist_ok=True)
+
+    out_h_file_name = f'{cname.lower()}.h'
+    out_c_file_name = f'{cname.lower()}.c'
+
+    out_h_file_path = os.path.join(out_abs_path, out_h_file_name)
+    out_c_file_path = os.path.join(out_abs_path, out_c_file_name)
+
+    out_h_file = open(out_h_file_path, 'w')
+    out_c_file = open(out_c_file_path, 'w')
 
     glyph_w = args.glyph_width
     glyph_h = args.glyph_height
