@@ -1,18 +1,18 @@
 # SSD1306Fnt
 ssd1306fnt.py is a simple script for generation of the fonts in the most suitable 
 format for the SSD1306 OLED display controller. It accepts a font file and produces 
-C-header (.h) file with an array of the font glyphs data and lookup-function, which 
-resolves an index of the glyph in array by given **UTF-8** code of the character. 
-The script allows to choose for which symbol ranges you want to generate glyphs (so, 
-you will not get any unnecessary glyphs). Script works only with UTF-8 for now.
+C source code (.h with interface and .c with corresponding font data) files with an 
+array of the font glyphs data and lookup-function, which resolves an index of the 
+glyph in array by given **UTF-8** code of the character. The script allows choosing 
+for which symbol ranges you want to generate glyphs (so, you won't get any unnecessary 
+glyphs). Script works only with UTF-8 for now.
 
 ### Commands
 ```
-ssd1306fnt.py fontfile out -c <char sets> -gh <glyph height>
+ssd1306fnt.py fontfile -cn <prefix for sources, name of .h and .c files> -c <char sets> -gh <glyph height>
 ```
 - `fontfile` - file of a desired font
-- `out` - output .h-file
-- `--cname`/`-cn` - prefix/suffix of the font related things in the .h out file
+- `--cname`/`-cn` - prefix/suffix of the font related things in the source files, name of generated .h and .c files
 - `--glyph_width`/`-gw` - glyph width
 - `--glyph_height`/`-gh` - glyph height (default - 8, equal to the SSD1306 page "height")
 - `--fields_left`/`-fl` - width of left indent
