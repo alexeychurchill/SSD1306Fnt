@@ -47,6 +47,12 @@ def parse_args():
         required=True,
         help='glyph height (default - 8, equal to the SSD1306 page "height")'
     )
+    args_parser.add_argument(
+        '--glyph_width_equal', '-gweq',
+        action='store_true',
+        default=False,
+        help='make glyphs equal by width'
+    )
     args_parser.add_argument('--fields_left', '-fl', type=int, default=0, help='width of left indent')
     args_parser.add_argument('--fields_right', '-fr', type=int, default=0, help='width of right indent')
     args_parser.add_argument('--chars', '-c', nargs='*', help='sets of chars')
@@ -105,21 +111,36 @@ def append_glyph(glyph_2d, target_width, target_height):
     return append_height(append_width(glyph_2d, target_width), target_height)
 
 
+def face_load_char(face, char, width=0, height=ssd1306_page_size):
+    char_flags = freetype.FT_LOAD_FLAGS['FT_LOAD_RENDER'] | freetype.FT_LOAD_TARGETS['FT_LOAD_TARGET_MONO']
+    face.set_pixel_sizes(width, height)
+    face.load_char(char, flags=char_flags)
+
+
+def find_max_glyph_width(face, chars, height):
+    max_width = None
+    for char in chars:
+        face_load_char(face, char, height=height)
+        glyph_width = face.glyph.bitmap.width
+        if max_width is None or max_width < glyph_width:
+            max_width = glyph_width
+    return max_width
+
+
 def generate_glyph(
         face,
         character,
         width=0,
         height=ssd1306_page_size,
         left_fields=0,
-        right_fields=0
+        right_fields=0,
+        pad_width=None
 ):
     if debug_mode:
         print('--------------------------------------')
         print(f'Generating char glyph for {character}, desired size: {width} x {height}...')
 
-    char_flags = freetype.FT_LOAD_FLAGS['FT_LOAD_RENDER'] | freetype.FT_LOAD_TARGETS['FT_LOAD_TARGET_MONO']
-    face.set_pixel_sizes(width, height)
-    face.load_char(character, flags=char_flags)
+    face_load_char(face, character, width, height)
     glyph_bitmap = face.glyph.bitmap
     glyph_width = glyph_bitmap.width
     glyph_height = glyph_bitmap.rows
@@ -156,7 +177,13 @@ def generate_glyph(
         else:
             print('Will append only vertically')
 
-    glyph_appended = append_glyph(glyph_2d, width, height) if width > 0 else append_height(glyph_2d, height)
+    glyph_appended = None
+    if pad_width is not None:
+        glyph_appended = append_glyph(glyph_2d, pad_width, height)
+    elif width > 0:
+        glyph_appended = append_glyph(glyph_2d, width, height)
+    else:
+        glyph_appended = append_height(glyph_2d, height)
 
     if debug_mode:
         if left_fields > 0 or right_fields > 0:
@@ -236,18 +263,26 @@ def convert_to_ssd1306_format(glyph_2d, g_width, g_height, hor_mode=False):
     return result
 
 
-def prepare_for_ssd1306(face, chars, glyph_w=None, glyph_h=0, left_fields=0, right_fields=0, hor_pages=False):
+def prepare_for_ssd1306(
+        face, chars,
+        glyph_w=None, glyph_h=0,
+        left_fields=0, right_fields=0,
+        hor_pages=False,
+        pad_width=None
+):
     def build_glyph(char):
         glyph = generate_glyph(
             face,
             char,
             width=glyph_w, height=glyph_h,
-            left_fields=left_fields, right_fields=right_fields
+            left_fields=left_fields, right_fields=right_fields,
+            pad_width=pad_width
         ) if glyph_w is not None else generate_glyph(
             face,
             char,
             height=glyph_h,
-            left_fields=left_fields, right_fields=right_fields
+            left_fields=left_fields, right_fields=right_fields,
+            pad_width=pad_width
         )
 
         real_w, real_h = glyph_size(glyph)
@@ -457,7 +492,8 @@ def app():
         chars_to_gen,
         glyph_w, glyph_h,
         args.fields_left, args.fields_right,
-        hor_pages=args.horizontal_paging
+        hor_pages=args.horizontal_paging,
+        pad_width=find_max_glyph_width(face, chars_to_gen, glyph_h) if args.glyph_width_equal else None
     )
     reduced_char_groups = groups_reduce(group_chars(chars_to_gen))
 

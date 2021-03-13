@@ -16,6 +16,7 @@ ssd1306fnt.py fontfile -cn <prefix for sources, name of .h and .c files> -c <cha
 - `--out_dir`/`-dir` - output directory, omit if current
 - `--glyph_width`/`-gw` - glyph width
 - `--glyph_height`/`-gh` - glyph height (default - 8, equal to the SSD1306 page "height")
+- `--glyph_width_equal`/`-gweq` - make glyphs equal by width
 - `--fields_left`/`-fl` - width of left indent
 - `--fields_right`/`-fr` - width of right indent
 - `--chars`/`-c` - sets of chars. Format: `single char` or `start char`-`end char`. 
